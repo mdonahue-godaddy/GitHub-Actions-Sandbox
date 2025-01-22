@@ -67,10 +67,7 @@ jobs:
       matrix:
         go-version: ['stable']  # only use ONE version of go here or the upload-artifact will fail
 
-    runs-on:
-      labels:
-        - self-hosted
-        - 6909-githubadmintools
+    runs-on: ['ubuntu-latest']
 
     ############################################
     # Grant minimal permissions
@@ -172,56 +169,8 @@ jobs:
           fi
           echo "REPORT_OPTIONS=${REPORT_OPTIONS}" >> "$GITHUB_ENV"
 
-      - name: go build
-        shell: bash
-        env:
-          APP_NAME: ${{ env.APP }}
-          GLDFLAGS: ${{ env.GLDFLAGS }}
-          TARGET_DIR: ${{ env.TARGET_DIR }}
-        run: |
-          set -x
-          go env
-          mkdir "$TARGET_DIR"
-          go build -x -v -ldflags="${GLDFLAGS}" \
-            -o "$TARGET_DIR/$APP_NAME" "cmd/$APP_NAME/main.go"
-          "$TARGET_DIR/$APP_NAME" -version
 
-      - name: CoPilot Report & Remove Inactive Seats
-        shell: bash
-        env:
-          APP_NAME: ${{ env.APP }}
-          GITHUB_PAT: ${{ env.GITHUB_PAT }}
-          REPORTS: ${{ env.REPORT_DIR }}
-          REPORT_OPERATIONS: ${{ github.event.inputs.operation || 'all' }}
-          REPORT_GRACE_DAYS: ${{ github.event.inputs.grace_days || 30 }}
-          REPORT_INACTIVE_DAYS: ${{ github.event.inputs.inactive_days || 90 }}
-          REPORT_OPTIONS: ${{ env.REPORT_OPTIONS }}
-          TARGET_DIR: ${{ env.TARGET_DIR }}
-        run: |
-          "$TARGET_DIR/$APP_NAME" \
-          -auth="$GITHUB_PAT" \
-          -operation="$REPORT_OPERATIONS" \
-          -enterprise=gdcorp \
-          -organization=gdcorp-engineering \
-          -organizationTeam=gh-copilot \
-          -reportsDir="$REPORTS" \
-          -copilotGraceDays="$REPORT_GRACE_DAYS" \
-          -copilotInactiveDays="$REPORT_INACTIVE_DAYS" $REPORT_OPTIONS
 
-      - name: Move and git add generated excel & json files
-        if: ${{ success() }}
-        shell: bash
-        env:
-          GITHUB_REPO: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -x
-          mv ${REPORT_DIR}/*.xlsx ${REPORT_DIR}/excel/
-          git add -v -f ${REPORT_DIR}/excel/*
-          mv ${REPORT_DIR}/*.json ${REPORT_DIR}/json/
-          git add -v -f ${REPORT_DIR}/json/*
-          git commit -v -m "Add new CoPilot Report Files" --no-verify
-          git push origin ${TARGET_REF} -f --no-verify
 
       - name: Slack Report Failure
         if: ${{ github.event_name == 'schedule' && failure() || cancelled() }}

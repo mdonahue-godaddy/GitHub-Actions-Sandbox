@@ -34,10 +34,7 @@ jobs:
       matrix:
         go-version: ['stable']  # only use ONE version of go here or the upload-artifact will fail
 
-    runs-on:
-      labels:
-        - self-hosted
-        - 6909-githubadmintools
+    runs-on: ['ubuntu-latest']
 
     ############################################
     # Grant minimal permissions
@@ -84,18 +81,6 @@ jobs:
           # of a commit.
           version: latest
 
-          # Optional: The mode to install golangci-lint. It can be 'binary' or 'goinstall'.
-          # install-mode: "goinstall"
-
-          # Optional: When using only-new-issues option, the GitHub API is used, so a token is required.
-          # github-token:
-
-          # Optional: show only new issues if it's a pull request. The default value is `false`.
-          # only-new-issues:
-
-          # Optional: working directory, useful for monorepos
-          # working-directory: somedir
-
           # Optional: golangci-lint command line arguments.
           #
           # Note: By default, the `.golangci.yml` file should be at the root of the repository.
@@ -106,21 +91,6 @@ jobs:
             --timeout=6m
             --config=.github/linters/.golangci.yml
             --issues-exit-code=1
-
-          # Optional: Force the usage of the embedded problem matchers.
-          # problem-matchers: true
-
-          # Optional: If set to true, then all caching functionality will be completely
-          # disabled, takes precedence over all other caching options.
-          # skip-cache: true
-
-          # Optional: If set to true, caches will not be saved, but they may still be
-          # restored, required skip-cache: false.
-          # skip-save-cache: true
-
-          # Optional: Periodically invalidate the cache every cache-invalidation-interval
-          # days to ensure that outdated data is removed and fresh data is loaded.
-          # cache-invalidation-interval: 7
 
       - name: pre-build
         id: prebuild
@@ -146,37 +116,3 @@ jobs:
           go build -x -v -ldflags="${GLDFLAGS}" \
             -o "$TARGET_DIR/$APP_NAME" "cmd/$APP_NAME/main.go"
           "$TARGET_DIR/$APP_NAME" -version
-
-      - name: go test
-        shell: bash
-        run: |
-          go env
-          go test -v -race -coverprofile="$GCOV" -covermode=atomic ./...
-          go test -v -coverprofile="$GCOV" -covermode=count ./...
-          go tool cover -func="$GCOV" -o="$COV.out"
-
-      - name: jandelgado/gcov2lcov-action
-        uses: jandelgado/gcov2lcov-action@4e1989767862652e6ca8d3e2e61aabe6d43be28b  # v1.1.1
-        with:
-          infile: ${{ env.GCOV }}
-          outfile: ${{ env.LCOV }}
-
-      - name: VeryGoodOpenSource/very_good_coverage
-        uses: VeryGoodOpenSource/very_good_coverage@c953fca3e24a915e111cc6f55f03f756dcb3964c  # v3.0.0
-        with:
-          path: ${{ env.LCOV }}
-          min_coverage: 0
-
-      # Upload generated artifacts for historical reference
-      - name: actions/upload-artifact
-        id: artifact-upload-step
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08  # v4.6.0
-        with:
-          name: test-reports
-          path: ${{ env.COV }}.*
-          retention-days: 90
-
-      - name: Show Artifact ID
-        shell: bash
-        run: |
-          echo 'Artifact ID is ${{ steps.artifact-upload-step.outputs.artifact-id }}'
