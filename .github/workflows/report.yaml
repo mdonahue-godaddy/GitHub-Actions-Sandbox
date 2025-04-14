@@ -88,7 +88,7 @@ jobs:
       #   The creds for SVC9IbBHMWNibxXW0-godaddy are in
       #   GHEC SA AWS Secret /GitHub/SVC9IbBHMWNibxXW0-godaddy-recovery
       - name: aws-actions/aws-secretsmanager-get-secrets
-        uses: aws-actions/aws-secretsmanager-get-secrets@fbd65ea98e018858715f591f03b251f02b2316cb  # v2.0.8
+        uses: aws-actions/aws-secretsmanager-get-secrets@5e19ff380d035695bdd56bbad320ca535c9063f2  # v2.0.9
         with:
           secret-ids: |
             SLACK, /webhooks/slack/prod
