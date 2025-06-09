@@ -97,9 +97,15 @@ jobs:
           # args: --timeout=30m --config=/my/path/.golangci.yml --issues-exit-code=0
           args: --verbose
             --tests=true
-            --timeout=6m
+            --timeout=1m
             --config=.github/linters/.golangci.yml
             --issues-exit-code=1
+
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2.3.9
+        env:
+          GITLEAKS_CONFIG: .github/linters/.gitleaks.toml
+          # GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}} # Only required for Organizations, not personal accounts.
 
       - name: pre-build
         id: prebuild
