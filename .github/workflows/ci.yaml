@@ -55,30 +55,25 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
-      # nslookup
-      - name: nslookup(s)
+      - name: nslookup
         continue-on-error: true
         shell: bash
         run: |
           set -x
-          nslookup sso.int.gdcorp.tools
+          nslookup i.do.not.exist.com
 
-      # nslookup
-      - name: nslookup(s)
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -x
-          nslookup cds-api.int.gdcorp.tools
-
-      # Show the Go environment
-      - name: report go environment
+      - name: go version, env, & clean --cache
         shell: bash
         run: |
           set -x
           go version
           go env
           go clean --cache
+
+      - name: go mod tidy
+        shell: bash
+        run: |
+          set -x
           go mod tidy
 
       - name: golangci/golangci-lint-action
@@ -97,31 +92,61 @@ jobs:
           # args: --timeout=30m --config=/my/path/.golangci.yml --issues-exit-code=0
           args: --verbose
             --tests=true
-            --timeout=6m
+            --timeout=1m
             --config=.github/linters/.golangci.yml
             --issues-exit-code=1
 
-      - name: pre-build
-        id: prebuild
-        shell: bash
-        run: |
-          set -x
-          echo "pre-building"
-          appversion=$(git describe --tags | awk '{gsub(/ /, "_"); print}')
-          buildtime=$(date -u "+%Y-%m-%dT%TZ")
-          goversion=$(go version | awk '{gsub(/ /, "_"); print}')
-          echo "GLDFLAGS=-s -w -X=${VPATH}.AppVersion=${appversion} -X=${VPATH}.Branch=${GITHUB_REF} -X=${VPATH}.BuildTime=${buildtime} -X=${VPATH}.Commit=${{ github.sha }} -X=${VPATH}.GoVersion=${goversion}" >> "$GITHUB_ENV"
-
-      - name: go build
-        shell: bash
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2.3.9
         env:
-          APP_NAME: ${{ env.APP }}
-          GLDFLAGS: ${{ env.GLDFLAGS }}
-          TARGET_DIR: dist
+          GITLEAKS_CONFIG: .github/linters/.gitleaks.toml
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}} # Only required for Organizations, not personal accounts.
+
+      - name: go test
+        shell: bash
         run: |
           set -x
           go env
-          mkdir "$TARGET_DIR"
-          go build -x -v -ldflags="${GLDFLAGS}" \
-            -o "$TARGET_DIR/$APP_NAME" "cmd/$APP_NAME/main.go"
-          "$TARGET_DIR/$APP_NAME" -version
+          go test -v -race -coverprofile=coverage.gcov -covermode=atomic ./...
+          go test -v -coverprofile=coverage.gcov -covermode=count ./...
+          go tool cover -func=coverage.gcov -o=coverage.out
+
+      - name: pre-build
+        id: prebuild
+        run: |
+          echo "pre-building"
+          goversion=$(go version)
+          echo "goversion=${goversion}"
+          echo "goversion=${goversion}" >> "$GITHUB_OUTPUT"
+          appversion=$(git describe --tags)
+          echo "appversion=${appversion}"
+          echo "appversion=${appversion}" >> "$GITHUB_OUTPUT"
+          buildtime=$(date -u "+%Y-%m-%dT%TZ")
+          echo "buildtime=${buildtime}"
+          echo "buildtime=${buildtime}" >> "$GITHUB_OUTPUT"
+
+      - name: go build
+        run: |
+          go env
+          mkdir dist
+          APP=sandbox
+          go build -x -v -ldflags="-s -w \
+            -X 'internal/version.AppVersion=${{ steps.prebuild.outputs.appversion }}' \
+            -X 'internal/version.Branch=${{ env.target_ref }}' \
+            -X 'internal/version.BuildTime=${{ steps.prebuild.outputs.buildtime }}' \
+            -X 'internal/version.Commit=${{ github.sha }}' \
+            -X 'internal/version.GoVersion=${{ steps.prebuild.outputs.goversion }}'" \
+            -o dist/${APP} cmd/${APP}/main.go
+
+      # Upload generated artifacts for historical reference
+      - name: actions/upload-artifact
+        id: artifact-upload-step
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: test-reports
+          path: ./coverage.*
+          retention-days: 90
+
+      - name: Show Artifact ID
+        run: |
+          echo 'Artifact ID is ${{ steps.artifact-upload-step.outputs.artifact-id }}'
